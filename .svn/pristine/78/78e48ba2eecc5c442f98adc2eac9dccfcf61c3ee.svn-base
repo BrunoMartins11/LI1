@@ -1,0 +1,92 @@
+
+import Data.Char (isDigit)
+import System.Environment
+import Text.Read
+import Data.Maybe
+    
+--avanca :: [String] -> Int -> [String]
+--avanca m t = avancaAux (length head m) m t
+
+--avancaAux :: Int -> [String] -> Int -> [String]
+--avancaAux d m t | t <= (d-2)^2 = blocos d m t (1,1)
+
+bombas :: [String] -> [[String]]
+bombas [] = []
+bombas m = retiraSegundoLinhas (temBomba m)
+
+temBomba :: [String] -> [String] -- localiza as bombas que foram plantadas no mapa
+temBomba [] = []
+temBomba ((h:t):ts) | h == '*' = (h:t): temBomba ts
+                    | otherwise = temBomba ts
+
+retiraSegundoLinhas :: [String] -> [[String]] -- e dada uma bomba e retira um segundo ao cornometro dela
+retiraSegundoLinhas [] = [] 
+retiraSegundoLinhas (h:t) = retiraSegundo h: retiraSegundoLinhas t
+
+retiraSegundo :: String -> [String]
+retiraSegundo [] = []
+retiraSegundo h = take 4 (drop 1 (words h)) ++ [show(read (head(drop 5 (words h))) - 1)]
+
+
+resultadoBomba :: [String] -> (Int,Int) -> Int -> Int -> [String] -- retira a bomba do fim do mapa, os jogadores se ficarem no sitio da bomba, e dado o raio da explosao e um contador que para qnd e igual ao raio 
+resultadoBomba l (x,y) t 0 = resultadoBomba (retiraJogadores (retiraBomba l (x,y)) (x,y)) (x,y) t 1
+resultadoBomba l (x,y) t i = resultadoExplosao (resultadoExplosao (resultadoExplosao (resultadoExplosao m (x,y) r (1,0) acc) (x,y) r (-1,0) acc) (x,y) r (0,1) acc) (x,y) r (0,-1) acc
+
+resultadoExplosao :: [String] -> (Int,Int) -> Int -> (Int,Int) -> Int -> [String] --e dado o mapa , a posiçao da exlplosao, um raio de explosao, um vetor de movimento de comprimento '1' em cada direçao, valor de acumulaçao (o raio atual da bomba sendo o maxio o raio da explosao)
+resultadoExplosao m (x,y) r (j,i) acc 
+	| daPosiçao m (x,y) == '#' = m 
+	| daPosiçao m (x,y) == '?' = retirarTijolo m (x,y) 0
+	| sePwrUp m (x,y) && daPosiçao m (x,y)== ' ' = retiraPwrUp m2 (x,y) 0
+	| seBomba m (x,y) = reduzContador m2 (x,y)
+	| otherwise = if acc < r   then resultadoExplosao m2 (x+j,y+i) r (j,i) (acc+1)
+		                     else m2
+	         where m2 = retiraJogadores m (x,y)
+
+
+daPosicao :: [String] -> (Int,Int) -> Char
+daPosicao m (x,y) = (l!!x)!!y
+
+retirarTijolo :: [String] -> (Int,Int) -> Int -> [String] 
+retirarTijolo [] _ n = []
+retirarTijolo (h:t) (x,y) n = if n == y then (retirarTijolo2 h x 0) : t 
+                                        else h : retirarTijolo t (x,y) (n+1) 
+          where retirarTijolo2 :: String -> Int -> Int -> String -- substitui um certo elemento de uma certa posiçao
+                retirarTijolo2 (h:t) x p = if x == p then ' ' : t
+                                                     else h : retirarTijolo2 t x (p+1)                  
+
+
+retiraPwrUp :: [String] -> (Int,Int) -> Int -> [String] 
+retiraPwrUp [] _ n = []
+retiraPwrUp (h:t) (x,y) n = if n == y then (retiraPwrUp2 h x 0):t
+                                      else h: retiraPwrUp t (x,y) n+1
+                       where retiraPwrUp2 :: String -> Int -> Int -> String -- substitui um certo elemento de uma certa posiçao
+                             retiraPwrUp2 (h:t) x p = if x == p then ' ' : t
+                                                     else h : retiraPwrUp2 t x p+1 
+
+
+--resultadoBomba l  (x,y) t i | x <= t && y==t && ((l!!y)!!x)/='#' = (take (x-1) (l!!y)) ++ " " ++  drop (x+1) (l!!y)
+  --                        | otherwise = l 
+
+retiraBomba :: [String] -> (Int,Int) -> [String]
+retiraBomba [] _ = []
+retiraBomba (h:t) (x,y) = if (h!!0)== '*' && (read (words h !! 1)) == x && (read (words h !! 2)) == y  then retiraBomba t (x,y) 
+	                                                                                                   else h : retiraBomba t (x,y)
+retiraJogadores :: [String] -> (Int,Int) -> [String]
+retiraJogadores [] _ = []
+retiraJogadores (h:t) (x,y) = if isDigit (h!!0) && (read (words h !! 1)) == x && (read (words h !! 2)) then retiraJogadores t (x,y)
+	                                                                                                   else h : retiraJogadores t (x,y)
+
+
+--blocos :: Int -> [String] -> Int -> (Int,Int) -> [String]
+--blocos d m t (x,y) | x < d = replace '#' blocos d m (t+1) (x+1,y)
+                        
+
+
+--main :: IO ()
+--main = do
+  --  a <- getArgs
+    --let ticks = readMaybe (a !! 0)
+    --w <- getContents
+    --if isJust ticks
+      --  then putStr $ unlines $ avanca (lines w) (fromJust ticks)
+        --else putStrLn "Parâmetros inválidos"

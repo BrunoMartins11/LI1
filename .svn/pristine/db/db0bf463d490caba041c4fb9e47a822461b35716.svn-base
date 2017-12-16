@@ -1,0 +1,124 @@
+
+import Data.Char (isDigit)
+import System.Environment
+import Text.Read
+import Data.Maybe
+import Data.List
+    
+avanca :: [String] -> Int -> [String]
+avanca m t = if ((veDim m)-2)^2 <= t then verificaTempo (tiraSegundo m) [] else verificaTempo m []
+
+
+tiraSegundo :: [String] -> [String]
+tiraSegundo [] = []
+tiraSegundo ((h:t):ts) = if (h=='*') then (unwords (take 5 (words (h:t))) ++ " " ++ unwords [show (read (last (words t)) - 1)]): tiraSegundo ts else (h:t): tiraSegundo ts
+
+temBomba :: [String] -> [String] -- localiza as bombas que foram plantadas no mapa
+temBomba [] = []
+temBomba ((h:t):ts) | h == '*' = (h:t): temBomba ts
+                    | otherwise = temBomba ts
+
+verificaTempo :: [String] -> [String] -> [String]
+verificaTempo [] acc = acc
+verificaTempo ((h:t):ts) acc = if h == '*' && last (words (h:t)) == show 0 then verificaTempo (resultadoBomba (acc++(h:t):ts) (read ((words(h:t))!!1),read ((words(h:t))!!2)) (read ((words(h:t))!!4)) 0 ) [] else verificaTempo ts (acc++[(h:t)])
+
+{- retira a bomba do fim do mapa, os jogadores se ficarem no sitio da bomba, e dado o raio da explosao e um contador que para qnd e igual ao raio 
+-}
+resultadoBomba :: [String] -> (Int,Int) -> Int -> Int -> [String]
+resultadoBomba m (x,y) r 0 = resultadoBomba (retiraJogadores (retiraBomba m (x,y)) (x,y)) (x,y) r 1
+resultadoBomba m (x,y) r acc = resultadoExplosao (resultadoExplosao (resultadoExplosao (resultadoExplosao m (x,y) r (1,0) acc) (x,y) r (-1,0) acc) (x,y) r (0,1) acc) (x,y) r (0,-1) acc
+
+{-Dado o mapa, a posiçao da explosao, um raio de explosao, um vetor de movimento de comprimento '1' em cada direçao, valor de acumulaçao (o raio atual da bomba sendo o maxio o raio da explosao)
+-}
+resultadoExplosao :: [String] -> (Int,Int) -> Int -> (Int,Int) -> Int -> [String]
+resultadoExplosao m (x,y) r (j,i) acc 
+    | daPosicao m (x,y) == '#' = m 
+    | daPosicao m (x,y) == '?' = retirarTijolo m (x,y) 0
+    | sePwrUp m (x,y) && daPosicao m (x,y)== ' ' = resultadoExplosao (tiraPwrUp m2 (x,y)) (x+j,y+i) r (j,i) (acc+1)
+    | seBomba m (x,y) = resultadoExplosao (reduzContador m2 (x,y)) (x+j,y+i) r (j,i) (acc+1)
+    | otherwise = if acc <= r then resultadoExplosao m2 (x+j,y+i) r (j,i) (acc+1)
+                             else m2
+             where m2 = retiraJogadores m (x,y)
+
+reduzContador :: [String] -> (Int,Int) -> [String]
+reduzContador [] _ = []
+reduzContador ((h:t):ts) (x,y) = if h == '*' && words (h:t)!!1 == show x && words (h:t)!!2 == show y then [unwords $ take 5 (words(h:t)) ++ "1": ts] else (h:t): reduzContador ts (x,y)
+
+daPosicao :: [String] -> (Int,Int) -> Char
+daPosicao m (x,y) = (m!!y)!!x
+
+retirarTijolo :: [String] -> (Int,Int) -> Int -> [String] 
+retirarTijolo [] _ n = []
+retirarTijolo (h:t) (x,y) n = if n == y then (retirarTijolo2 h x 0) : t 
+                                        else h : retirarTijolo t (x,y) (n+1) 
+          where retirarTijolo2 :: String -> Int -> Int -> String -- substitui um certo elemento de uma certa posiçao
+                retirarTijolo2 (h:t) x p = if x == p then ' ' : t
+                                                     else h : retirarTijolo2 t x (p+1)                  
+
+sePwrUp :: [String] -> (Int,Int) -> Bool
+sePwrUp [] (x,y) = False
+sePwrUp ((h:t):ts) (x,y) = if (((h == '+') || (h == '!')) && ((read((words (h:t))!!1)) == x) && ((read((words (h:t))!!2)) == y)) then True 
+                                                                                                                              else sePwrUp ts (x,y)
+seBomba :: [String] -> (Int,Int) -> Bool
+seBomba [] (x,y) = False
+seBomba ((h:t):ts) (x,y) = if (h == '*') && ((read((words (h:t))!!1)) == x) && ((read((words (h:t))!!2)) == y) then True 
+                                                                                                                else seBomba ts (x,y)
+retiraBomba :: [String] -> (Int,Int) -> [String]
+retiraBomba [] _ = []
+retiraBomba (h:t) (x,y) = if (h!!0)== '*' && (read (words h !! 1)) == x && (read (words h !! 2)) == y  then retiraBomba t (x,y) 
+                                                                                                       else h : retiraBomba t (x,y)
+retiraJogadores :: [String] -> (Int,Int) -> [String]
+retiraJogadores [] _ = []
+retiraJogadores (h:t) (x,y) = if isDigit (h!!0) && (read (words h !! 1)) == x && (read (words h !! 2)) then retiraJogadores t (x,y)
+                                                                                                       else h : retiraJogadores t (x,y)
+tiraPwrUp :: [String] -> (Int,Int) -> [String]
+tiraPwrUp [] _ = []
+tiraPwrUp ((h:t):ts) (x,y) = if ((h=='+') || (h=='!')) && (read ((words (h:t))!!1) == x) && (read ((words (h:t))!!2) == y) then tiraPwrUp (delete (h:t) ((h:t):ts)) (x,y) else (h:t) : tiraPwrUp ts (x,y)
+
+--Espiral
+espiral :: [String] -> (Int,Int) -> (Int,Int) -> Int -> Int ->  [String] -- entra o mapa, a posiçao inicial (1,1), um vetor de movimento, um acumulador e o numero de blocos que vao ser postos no mapa e devolve o mapa
+espiral m _ _ _ 0 = mataTudo m []
+espiral m (x,y) (j,i) acc blocos = espiral (mudaPos m (x,y) '#' 0) (x+j,y+i) novoVetor novoacc (blocos-1)
+                              where (novoVetor,novoacc) =  verificaBorda (veDim m) (x,y) (j,i) acc
+veDim :: [String] -> Int
+veDim m = length (m!!0)
+
+verificaBorda :: Int -> (Int,Int) -> (Int,Int) -> Int -> ((Int,Int),Int)
+verificaBorda dim (x,y) (1,0) acc = if (x+1) == acc then ((0,1),acc) else ((1,0),acc)
+verificaBorda dim (x,y) (0,1) acc = if (y+1) == acc then (((-1),0),acc) else ((0,1),acc)                                 
+verificaBorda dim (x,y) ((-1),0) acc = if (x-1) == acc then ((0,(-1)),(acc-1)) else (((-1),0),acc)
+verificaBorda dim (x,y) (0,(-1)) acc = if (y-1) == acc then ((1,0),acc) else ((0,(-1)),acc) 
+
+veBlocos :: Int -> Int
+veBlocos dim = (dim - 2)^2
+
+mataTudo :: [String] -> [String] -> [String]
+mataTudo [] acc = acc
+mataTudo (h:t) acc = if elem (h!!0) ['+','!','0','1','2','3','4'] then if (acc!!x!!y == '#') then mataTudo t acc else mataTudo t (acc ++ [h]) else mataTudo t (acc ++ [h])
+                                      where (x,y) = ((read ((words h)!!1)),(read ((words h)!!2)))
+
+
+mudaPos :: [String] -> (Int,Int) -> Char -> Int -> [String] --um mapa, a posiçao de mudaça, o caracter que vai entrar e devolve o mapa alterado
+mudaPos [] _ _ _ = []
+mudaPos (h:t) (x,y) c acc = if acc == y then (mudaPosx h x c 0):t else h: mudaPos t (x,y) c (acc+1)
+
+mudaPosx :: String -> Int -> Char -> Int -> String
+mudaPosx [] _ _ _ = []
+mudaPosx (hx:tx) x c accx = if accx == x then (c : tx) else hx: mudaPosx tx x c (accx + 1)   
+
+
+
+
+
+                        
+
+
+
+main :: IO ()
+main = do
+    a <- getArgs
+    let ticks = readMaybe (a !! 0)
+    w <- getContents
+    if isJust ticks
+        then putStr $ unlines $ avanca (lines w) (fromJust ticks)
+        else putStrLn "Parâmetros inválidos"
